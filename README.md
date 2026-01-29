@@ -96,6 +96,7 @@ docker compose up -d --build
 docker compose down
 
 ## Upload Multiple Images (Go / Fiber)
+```go
 func (uc *imageUsecaseImpl) UploadImages(c *fiber.Ctx) ([]entities.Images_vit_b32norm, error) {
 	ctx := context.Background()
 
@@ -169,4 +170,4 @@ func (uc *imageUsecaseImpl) UploadImages(c *fiber.Ctx) ([]entities.Images_vit_b3
 
 	return savedImages, nil
 }
----
+```
