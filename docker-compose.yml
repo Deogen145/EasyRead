@@ -1,0 +1,34 @@
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: pgvector
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: vectordb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+
+  clip_server:
+    build: ./clip_server
+    container_name: clip_server
+    command: uvicorn clip_server:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001" 
+
+  api:
+    build: ./api
+    container_name: api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - pgvector
+      - clip_server
+    volumes:
+      - image_data:/app/storage/images
+
+volumes:
+  pgvector_data:
+  image_data:
