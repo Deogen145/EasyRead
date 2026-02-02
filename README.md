@@ -16,25 +16,6 @@ Key features:
 - Vector similarity search using pgvector
 - Duplicate / near-duplicate image prevention
 
----
-
-## Architecture
-Client
-|
-v
-API (Go / Fiber)
-|
-|-- Upload image(s)
-|-- Call CLIP server
-|-- Similarity check (pgvector)
-|-- Save image + embedding
-|
-PostgreSQL (pgvector)
-|
-CLIP Server (FastAPI + PyTorch)
-
-
----
 
 ## Tech Stack
 
@@ -88,6 +69,16 @@ CREATE TABLE images_vit_b32norm (
 Prerequisites
 - Docker
 - Docker Compose
+
+## API server
+- GET ALL url = http://localhost:3000/api/images?page=1
+- GET BY ID url = http://localhost:3000/api/images/:id
+- GET BY NAME url = http://localhost:3000/api/images/name/:name
+
+- POST UPLOAD url = http://localhost:3000/api/images/upload
+  - form-data key = file (single), files (multiple)
+
+- DELETE url = http://localhost:3000/api/images/:id
 
 ## Start all services
 docker compose up -d --build
