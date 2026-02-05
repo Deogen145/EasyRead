@@ -1,9 +1,8 @@
 package handlers
 
 import (
-	"fmt"
 	"app/easyread/usecases"
-	"log"
+	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -18,15 +17,40 @@ func NewImageHandler(uc usecases.ImageUsecase) *ImageHandler {
 }
 
 func (h *ImageHandler) GetAll(c *fiber.Ctx) error {
-	images, err := h.uc.GetAllImages(c.Context())
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+
+	images, err := h.uc.GetAll(c.Context(), page, limit)
 	if err != nil {
-		log.Println("GetAll error:", err)
-		return c.Status(500).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.JSON(images)
+}
+
+func (h *ImageHandler) GetByID(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid id"})
+	}
+
+	img, err := h.uc.GetByID(c.Context(), int64(id))
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(img)
+}
+
+func (h *ImageHandler) GetByName(c *fiber.Ctx) error {
+	name := c.Params("name")
+
+	img, err := h.uc.GetByName(c.Context(), name)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(img)
 }
 
 func (h *ImageHandler) Uploaded(c *fiber.Ctx) error {
@@ -38,7 +62,7 @@ func (h *ImageHandler) Uploaded(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"data":    img,
+		"data": img,
 	})
 }
 
@@ -46,7 +70,7 @@ func (h *ImageHandler) Delete(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 
-	if err := h.uc.DeleteImage(c.Context(), id); err != nil {
+	if err := h.uc.DeleteByID(c); err != nil {
 		return c.Status(404).JSON(fiber.Map{
 			"error": err.Error(),
 		})
@@ -56,4 +80,3 @@ func (h *ImageHandler) Delete(c *fiber.Ctx) error {
 		"message": fmt.Sprintf("Deleted image %d", id),
 	})
 }
-

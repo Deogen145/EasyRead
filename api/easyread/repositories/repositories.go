@@ -11,9 +11,11 @@ import (
 )
 
 type ImageRepository interface {
-	GetAll(ctx context.Context) ([]entities.Images_vit_b32norm, error)
+	GetAll(ctx context.Context,  limit int, offset int) ([]entities.ImageGET, error)
+	GetByID(ctx context.Context, id int64) (entities.ImageGET, error)
+	GetByName(ctx context.Context, name string) (entities.ImageGET, error)
 	Insert(ctx context.Context, img entities.Images_vit_b32norm) (entities.Images_vit_b32norm, error)
-	Delete(ctx context.Context, id int64) error
+	Delete(ctx context.Context, id int) error
 	SearchByVector(ctx context.Context, queryVec []float32, limit int) ([]entities.Images_vit_b32norm, error)
 }
 
@@ -25,31 +27,71 @@ func NewImageRepository(db *pgxpool.Pool) ImageRepository {
 	return &pgImageRepository{db: db}
 }
 
-func (r *pgImageRepository) GetAll(ctx context.Context) ([]entities.Images_vit_b32norm, error) {
-	rows, err := r.db.Query(ctx, `SELECT id, name, path, img_embedding FROM Images_vit_b32norm;`)
+func (r *pgImageRepository) GetAll(ctx context.Context, limit int, offset int) ([]entities.ImageGET, error) {
+
+	rows, err := r.db.Query(ctx, `SELECT id, name, path FROM Images_vit_b32norm ORDER BY id ASC LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var images []entities.Images_vit_b32norm
-
+	var images []entities.ImageGET
 	for rows.Next() {
-		var img entities.Images_vit_b32norm
-
+		var img entities.ImageGET
 		if err := rows.Scan(
 			&img.ID,
 			&img.Name,
 			&img.Path,
-			&img.Img_Embedding,
 		); err != nil {
 			return nil, err
 		}
-
 		images = append(images, img)
 	}
 
 	return images, nil
+}
+
+
+func (r *pgImageRepository) GetByID(
+	ctx context.Context,
+	id int64,
+) (entities.ImageGET, error) {
+
+	var img entities.ImageGET
+
+	err := r.db.QueryRow(ctx, `SELECT id, name, path FROM Images_vit_b32norm WHERE id = $1`, 
+	id).Scan(
+		&img.ID,
+		&img.Name,
+		&img.Path,
+	)
+
+	if err != nil {
+		return img, err
+	}
+
+	return img, nil
+}
+
+func (r *pgImageRepository) GetByName(
+	ctx context.Context,
+	name string,
+) (entities.ImageGET, error) {
+
+	var img entities.ImageGET
+
+	err := r.db.QueryRow(ctx, `SELECT id, name, path FROM Images_vit_b32norm WHERE name = $1`, 
+	name).Scan(
+		&img.ID,
+		&img.Name,
+		&img.Path,
+	)
+
+	if err != nil {
+		return img, err
+	}
+
+	return img, nil
 }
 
 func (r *pgImageRepository) Insert(ctx context.Context, img entities.Images_vit_b32norm) (entities.Images_vit_b32norm, error) {
@@ -70,12 +112,8 @@ func (r *pgImageRepository) Insert(ctx context.Context, img entities.Images_vit_
 	return img, nil
 }
 
-func (r *pgImageRepository) Delete(ctx context.Context, id int64) error {
-	cmd, err := r.db.Exec(
-		ctx,
-		`DELETE FROM Images_vit_b32norm WHERE id = $1`,
-		id,
-	)
+func (r *pgImageRepository) Delete(ctx context.Context, id int) error {
+	cmd, err := r.db.Exec(ctx, `DELETE FROM Images_vit_b32norm WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -87,15 +125,9 @@ func (r *pgImageRepository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *pgImageRepository) SearchByVector(
-	ctx context.Context,
-	queryVec []float32, // รับเวกเตอร์ที่เราต้องการเปรียบเทียบ
-	limit int,
-) ([]entities.Images_vit_b32norm, error) {
-	// สร้าง pgvector จาก queryVec
-	vec := pgvector.NewVector(queryVec)
 
-	// สร้าง SQL Query ที่ใช้คำนวณ cosine distance และคล้ายกัน
+func (r *pgImageRepository) SearchByVector(ctx context.Context, queryVec []float32, limit int,) ([]entities.Images_vit_b32norm, error) {
+	vec := pgvector.NewVector(queryVec)
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id,
@@ -106,7 +138,7 @@ func (r *pgImageRepository) SearchByVector(
 		FROM Images_vit_b32norm
 		ORDER BY cosine_dist
 		LIMIT $2
-	`, vec, limit) // ส่งเวกเตอร์และ limit ไปที่ฐานข้อมูล
+	`, vec, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +147,6 @@ func (r *pgImageRepository) SearchByVector(
 	var images []entities.Images_vit_b32norm
 	for rows.Next() {
 		var img entities.Images_vit_b32norm
-		// ดึงข้อมูลจากผลลัพธ์
 		if err := rows.Scan(
 			&img.ID,
 			&img.Name,

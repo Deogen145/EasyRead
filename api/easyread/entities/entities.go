@@ -10,3 +10,9 @@ type Images_vit_b32norm struct {
 	CosineDist    float64         `json:"cosine_dist"`    // ค่าความแตกต่าง
 	CosinePercent float64         `json:"cosine_percent"` // ค่าความคล้ายกัน
 }
+
+type ImageGET struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+}

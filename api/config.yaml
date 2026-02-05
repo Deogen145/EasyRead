@@ -2,8 +2,8 @@ server:
   port: ":3000"
 
 db:
-  host: pgvector
+  host: pgvector #pgvector 5432
   port: 5432
   user: postgres
   password: 1234
-  name: postgres
+  name: vectordb

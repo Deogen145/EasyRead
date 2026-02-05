@@ -5,7 +5,7 @@ import (
 
 	"app/easyread/config"
 	"app/easyread/database"
-	"app/easyread/handler"
+	handlers "app/easyread/handler"
 	"app/easyread/repositories"
 	"app/easyread/usecases"
 
@@ -26,12 +26,18 @@ func main() {
 	uc := usecases.NewImageUsecase(repo)
 	h := handlers.NewImageHandler(uc)
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 1024 * 1024 * 1024,
+	})
 
-	app.Get("/", h.GetAll)
-	app.Post("/upload", h.Uploaded)
-	app.Delete("/delete/:id", h.Delete)
+	app.Get("/api/images", h.GetAll)
+	app.Get("/api/images/:id", h.GetByID)
+	app.Get("/api/images/name/:name", h.GetByName)
 
+	app.Post("/api/upload", h.Uploaded)
+	app.Delete("/api/delete/:id", h.Delete)
+
+	
 	log.Fatal(app.Listen(conf.Server.Port))
 
 }

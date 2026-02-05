@@ -147,7 +147,7 @@ func (uc *imageUsecaseImpl) UploadImages(c *fiber.Ctx) ([]entities.Images_vit_b3
 		// Save DB
 		img := entities.Images_vit_b32norm{
 			Name:          file.Filename,
-			Path:          "/" + savePath,
+			Path:          "\\" + savePath,
 			Img_Embedding: pgvector.NewVector(vector),
 		}
 

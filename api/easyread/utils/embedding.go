@@ -23,7 +23,7 @@ func CLIPEmbedding(imageBytes []byte) ([]float32, error) {
 	part.Write(imageBytes)
 	writer.Close()
 
-	req, err := http.NewRequest("POST", "http://clip_server:8001/clip/encode", &buf)
+	req, err := http.NewRequest("POST", "http://clip_server:8001/clip/encode", &buf) // http://clip_server:8001/clip/encode
 	if err != nil {
 		return nil, err
 	}
@@ -50,15 +50,23 @@ func CLIPEmbedding(imageBytes []byte) ([]float32, error) {
 
 func NormalizeL2(vec []float32) []float32 {
 	var sum float64
-	for _, v := range vec {
+	for _, v := range vec { // คำนวณผลรวมของกำลังสอง
 		sum += float64(v * v)
 	}
-	norm := float32(math.Sqrt(sum))
+	norm := float32(math.Sqrt(sum)) // คำนวณนอร์ม (L2 norm)
 	if norm == 0 {
-		return vec
+		return vec // ถ้านอร์มเป็นศูนย์ คืนค่าเวกเตอร์เดิม
 	}
-	for i := range vec {
-		vec[i] /= norm
+	for i := range vec { // ปรับแต่งเวกเตอร์ให้เป็นนอร์ม 1
+		vec[i] /= norm // แบ่งแต่ละองค์ประกอบด้วยนอร์ม
 	}
-	return vec
+	return vec // คืนค่าเวกเตอร์ที่ปรับแต่งแล้ว
 }
+
+// vector A = [0.01, 0.02, 0.03]
+// vector B = [2.3, -1.9, 0.8]
+// - มิติเท่ากัน
+// - แต่ ค่าข้างในใหญ่กว่าเยอะ
+// ผลคือ:
+// ||A|| ≈ 0.4
+// ||B|| ≈ 20+
