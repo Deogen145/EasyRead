@@ -66,6 +66,20 @@ func (h *ImageHandler) Uploaded(c *fiber.Ctx) error {
 	})
 }
 
+func (h *ImageHandler) UploadCSV(c *fiber.Ctx) error {
+	count, err := h.uc.UploadCSV(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"inserted": count,
+	})
+}
+
+
 func (h *ImageHandler) Delete(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, _ := strconv.ParseInt(idStr, 10, 64)

@@ -35,9 +35,10 @@ func main() {
 	app.Get("/api/images/name/:name", h.GetByName)
 
 	app.Post("/api/upload", h.Uploaded)
+	app.Post("/api/uploadcsv", h.UploadCSV)
+
 	app.Delete("/api/delete/:id", h.Delete)
 
-	
 	log.Fatal(app.Listen(conf.Server.Port))
 
 }

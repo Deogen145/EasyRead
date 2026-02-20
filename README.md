@@ -76,6 +76,8 @@ Prerequisites
 - GET BY NAME url = http://localhost:3000/api/images/name/:name
 
 - POST UPLOAD url = http://localhost:3000/api/images/upload
+  - form-data key = files
+- POST UPLOAD CSV url = http://localhost:3000/api/images/uploadCSV
   - form-data key = file (single), files (multiple)
 
 - DELETE url = http://localhost:3000/api/images/:id
@@ -86,79 +88,29 @@ docker compose up -d --build
 ## Stop all services
 docker compose down
 
-## Upload Multiple Images (Go / Fiber)
-```go
-func (uc *imageUsecaseImpl) UploadImages(c *fiber.Ctx) ([]entities.Images_vit_b32norm, error) {
-	ctx := context.Background()
 
-	form, err := c.MultipartForm()
-	if err != nil {
-		return nil, err
-	}
 
-	files := form.File["files"]
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no files uploaded")
-	}
+## CSV Upload Format
 
-	var savedImages []entities.Images_vit_b32norm
+The system supports bulk image uploads using a CSV file.
 
-	for _, file := range files {
-		opened, err := file.Open()
-		if err != nil {
-			return nil, err
-		}
+File Requirements
 
-		fileBytes, err := io.ReadAll(opened)
-		opened.Close()
-		if err != nil {
-			return nil, err
-		}
+- The file must be in CSV format (.csv)
 
-		// Generate embedding
-		vector, err := utils.CLIPEmbedding(fileBytes)
-		if err != nil {
-			return nil, fmt.Errorf("embedding error (%s): %v", file.Filename, err)
-		}
+- The file must contain exactly 2 columns
 
-		// Similarity check
-		results, err := uc.repo.SearchByVector(ctx, vector, 1)
-		if err != nil {
-			return nil, err
-		}
+- The file must not contain empty rows
 
-		const threshold = 90.0
-		if len(results) > 0 && results[0].CosinePercent >= threshold {
-			return nil, fmt.Errorf(
-				"image %s too similar (%.2f%%)",
-				file.Filename,
-				results[0].CosinePercent,
-			)
-		}
+## Column Structure
 
-		// Save file
-		saveDir := "storage/images"
-		os.MkdirAll(saveDir, os.ModePerm)
-		savePath := filepath.Join(saveDir, filepath.Base(file.Filename))
-		if err := os.WriteFile(savePath, fileBytes, 0644); err != nil {
-			return nil, err
-		}
+1. First column: image filename (e.g., "image1.jpg")
+2. Second column: image URL (e.g., "https://example.com/image1.jpg")
 
-		// Save DB
-		img := entities.Images_vit_b32norm{
-			Name:          file.Filename,
-			Path:          "\\" + savePath,
-			Img_Embedding: pgvector.NewVector(vector),
-		}
+## Notes
 
-		saved, err := uc.repo.Insert(ctx, img)
-		if err != nil {
-			return nil, err
-		}
+- The image URL must be accessible (no authentication required).
 
-		savedImages = append(savedImages, saved)
-	}
+- Supported image formats: .jpg, .jpeg, .png
 
-	return savedImages, nil
-}
-```
+- If the image is duplicate (based on embedding similarity threshold), it will not be stored.
