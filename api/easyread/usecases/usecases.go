@@ -23,7 +23,7 @@ import (
 )
 
 type ImageUsecase interface {
-	UploadImage(c *fiber.Ctx) ([]entities.Images_vit_b32norm, error)
+	UploadImage(c *fiber.Ctx) (*entities.Images_vit_b32norm, error)
 	UploadCSV(c *fiber.Ctx) (int, error)
 	GetAll(ctx context.Context, page, limit int) ([]entities.ImageGET, error)
 	GetByID(ctx context.Context, id int64) (entities.ImageGET, error)
@@ -40,98 +40,90 @@ func NewImageUsecase(repo repositories.ImageRepository) ImageUsecase {
 }
 
 // Upload multiple images + generate embedding + check similarity + save
-func (uc *imageUsecaseImpl) UploadImage(c *fiber.Ctx) ([]entities.Images_vit_b32norm, error) {
+func (uc *imageUsecaseImpl) UploadImage(c *fiber.Ctx) (*entities.Images_vit_b32norm, error) {
 	ctx := context.Background()
 
-	form, err := c.MultipartForm()
+	// รับไฟล์เดียวจาก key "file"
+	file, err := c.FormFile("files")
 	if err != nil {
-		return nil, fmt.Errorf("cannot read multipart form: %v", err)
+		return nil, fmt.Errorf("no file uploaded")
 	}
 
-	// input
-	files := form.File["files"]
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no files uploaded")
+	if !isAllowed(file.Filename) {
+		return nil, fmt.Errorf("only .jpg, .jpeg, .png are allowed")
 	}
-	var savedImages []entities.Images_vit_b32norm
 
-	// read
-	for _, file := range files {
-		if !isAllowed(file.Filename) {
-			return nil, fmt.Errorf("only .jpg, .jpeg, .png are allowed")
-		}
-		opened, err := file.Open()
-		if err != nil {
-			return nil, err
-		}
-		defer opened.Close()
+	opened, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer opened.Close()
 
-		fileBytes, err := io.ReadAll(opened)
-		if err != nil {
-			return nil, err
-		}
+	fileBytes, err := io.ReadAll(opened)
+	if err != nil {
+		return nil, err
+	}
 
-		// embedding
-		vector, err := utils.CLIPEmbedding(fileBytes)
-		if err != nil {
-			return nil, fmt.Errorf("embedding error (%s): %v", file.Filename, err)
-		}
+	// embedding
+	vector, err := utils.CLIPEmbedding(fileBytes)
+	if err != nil {
+		return nil, fmt.Errorf("embedding error (%s): %v", file.Filename, err)
+	}
 
-		// similarity check
-		results, err := uc.repo.SearchByVector(ctx, vector, 1)// search top 1
-		if err != nil {
-			return nil, err
-		}
+	// similarity check
+	results, err := uc.repo.SearchByVector(ctx, vector, 1)
+	if err != nil {
+		return nil, err
+	}
 
-		const threshold = 90.0
+	const threshold = 90.0
 
-		if len(results) > 0 {
-			sim := results[0].CosinePercent
-			fmt.Printf(
-				"[CHECK] %s → %.2f%% (id=%d name=%s)\n",
-				file.Filename,
+	if len(results) > 0 {
+		sim := results[0].CosinePercent
+		fmt.Printf(
+			"[CHECK] %s → %.2f%% (id=%d name=%s)\n",
+			file.Filename,
+			sim,
+			results[0].ID,
+			results[0].Name,
+		)
+
+		if sim >= threshold {
+			return nil, fmt.Errorf(
+				"image too similar %.2f%% (id=%d name=%s)",
 				sim,
 				results[0].ID,
 				results[0].Name,
 			)
-
-			if sim >= threshold {
-				return nil, fmt.Errorf(
-					"image too similar %.2f%% (id=%d name=%s)",
-					sim,
-					results[0].ID,
-					results[0].Name,
-				)
-			}
 		}
-
-		// save file
-		saveDir := "storage/images"
-		if err := os.MkdirAll(saveDir, os.ModePerm); err != nil {
-			return nil, err
-		}
-
-		fileName := filepath.Base(file.Filename)
-		savePath := filepath.Join(saveDir, fileName)
-
-		if err := os.WriteFile(savePath, fileBytes, 0644); err != nil {
-			return nil, err
-		}
-
-		// save DB
-		img := entities.Images_vit_b32norm{
-			Name:          fileName,
-			Path:          "/" + savePath,
-			Img_Embedding: pgvector.NewVector(vector),
-		}
-
-		savedImg, err := uc.repo.Insert(ctx, img)
-		if err != nil {
-			return nil, err
-		}
-		savedImages = append(savedImages, savedImg)
 	}
-	return savedImages, nil
+
+	// save file
+	saveDir := "storage/images"
+	if err := os.MkdirAll(saveDir, os.ModePerm); err != nil {
+		return nil, err
+	}
+
+	fileName := filepath.Base(file.Filename)
+	savePath := filepath.Join(saveDir, fileName)
+
+	if err := os.WriteFile(savePath, fileBytes, 0644); err != nil {
+		return nil, err
+	}
+
+	// save DB
+	img := entities.Images_vit_b32norm{
+		Name:          fileName,
+		Path:          "/" + savePath,
+		Img_Embedding: pgvector.NewVector(vector),
+	}
+
+	savedImg, err := uc.repo.Insert(ctx, img)
+	if err != nil {
+		return nil, err
+	}
+
+	return &savedImg, nil
 }
 
 // Get
